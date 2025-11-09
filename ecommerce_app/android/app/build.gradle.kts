@@ -1,47 +1,95 @@
-plugins {
-    id("com.android.application")
-    // START: FlutterFire Configuration
-    id("com.google.gms.google-services")
-    // END: FlutterFire Configuration
-    id("kotlin-android")
-    // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
-    id("dev.flutter.flutter-gradle-plugin")
+allprojects {
+    repositories {
+        google()
+        mavenCentral()
+        // Add these repositories for Flutter and common dependencies
+        maven { url = uri("https://storage.googleapis.com/download.flutter.io") }
+        maven { url = uri("https://www.jitpack.io") }
+    }
 }
 
-android {
-    namespace = "com.example.ecommerce_app"
-    compileSdk = flutter.compileSdkVersion
-    ndkVersion = flutter.ndkVersion
+val newBuildDir: Directory =
+    rootProject.layout.buildDirectory
+        .dir("../../build")
+        .get()
+rootProject.layout.buildDirectory.value(newBuildDir)
 
-    compileOptions {
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
-    }
-
-    defaultConfig {
-        // TODO: Specify your own unique Application ID (https://developer.android.com/studio/build/application-id.html).
-        applicationId = "com.example.ecommerce_app"
-        // You can update the following values to match your application needs.
-        // For more information, see: https://flutter.dev/to/review-gradle-config.
-        minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
-        versionCode = flutter.versionCode
-        versionName = flutter.versionName
-    }
-
-    buildTypes {
-        release {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+subprojects {
+    val newSubprojectBuildDir: Directory = newBuildDir.dir(project.name)
+    project.layout.buildDirectory.value(newSubprojectBuildDir)
+    
+    // Add Java version compatibility
+    afterEvaluate {
+        // For Android projects
+        project.extensions.findByType(com.android.build.gradle.BaseExtension::class.java)?.let { android ->
+            android.compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_1_8
+                targetCompatibility = JavaVersion.VERSION_1_8
+            }
+        }
+        
+        // For Kotlin projects
+        tasks.withType<org.jetbrains.kotlin.gradle.tasks.KotlinCompile> {
+            kotlinOptions {
+                jvmTarget = "1.8"
+            }
         }
     }
 }
 
-flutter {
-    source = "../.."
+subprojects {
+    project.evaluationDependsOn(":app")
+    
+    // Add Android configuration for app and library modules
+    plugins.withId("com.android.application") {
+        configure<com.android.build.gradle.AppExtension> {
+            compileSdk = 34
+            defaultConfig {
+                minSdk = 21
+                targetSdk = 34
+                versionCode = 1
+                versionName = "1.0"
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_1_8
+                targetCompatibility = JavaVersion.VERSION_1_8
+            }
+        }
+    }
+    
+    plugins.withId("com.android.library") {
+        configure<com.android.build.gradle.LibraryExtension> {
+            compileSdk = 34
+            defaultConfig {
+                minSdk = 21
+                targetSdk = 34
+            }
+            compileOptions {
+                sourceCompatibility = JavaVersion.VERSION_1_8
+                targetCompatibility = JavaVersion.VERSION_1_8
+            }
+        }
+    }
+}
+
+tasks.register<Delete>("clean") {
+    delete(rootProject.layout.buildDirectory)
+}
+
+// Add dependency resolution strategy to fix version conflicts
+configurations.all {
+    resolutionStrategy {
+        // Force specific versions if needed
+        force(
+            "androidx.core:core-ktx:1.12.0",
+            "androidx.appcompat:appcompat:1.6.1",
+            "com.google.android.material:material:1.10.0"
+        )
+        
+        // Prefer project modules over external dependencies
+        preferProjectModules()
+        
+        // Fail on version conflict
+        failOnVersionConflict()
+    }
 }
